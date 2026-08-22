@@ -7,6 +7,12 @@
           <video ref="videoEl" class="player-video" controls playsinline preload="metadata" :poster="v.vod_pic || ''"></video>
           <div v-if="playerMessage" class="player-state">{{ playerMessage }}</div>
         </div>
+        <div v-if="sources.length > 1" class="source-bar">
+          <span>播放线路：</span>
+          <button v-for="(source,index) in sources" :key="`${source.url}-${index}`" :class="{active:index===sourceIndex}" @click="selectSource(index)">
+            {{ source.name || `线路${index + 1}` }}
+          </button>
+        </div>
       </section>
 
       <section class="video-info">
@@ -36,57 +42,79 @@ import Hls from 'hls.js'
 import { getDetail, getCategoryVideos, detailItem, playSources } from '../api/vod'
 import VideoCard from '../components/VideoCard.vue'
 
-const route=useRoute(), v=ref(null), recommend=ref([]), videoEl=ref(null), playerMessage=ref('')
-let hls=null, mediaError=null, stopped=false
+const route=useRoute(), v=ref(null), recommend=ref([]), sources=ref([]), sourceIndex=ref(0), videoEl=ref(null), playerMessage=ref('')
+let hls=null, mediaError=null, stopped=false, loadToken=0
 
 function destroyPlayer(){
-  hls?.destroy(); hls=null
+  if(hls){hls.destroy();hls=null}
   if(videoEl.value && mediaError) videoEl.value.removeEventListener('error',mediaError)
   mediaError=null
   if(videoEl.value){videoEl.value.pause();videoEl.value.removeAttribute('src');videoEl.value.load()}
 }
 function normalizeUrl(url){const s=String(url||'').trim();return s.startsWith('//')?`https:${s}`:s}
-function mountPlayer(item){
+function mountPlayer(url){
   destroyPlayer()
-  const source=normalizeUrl(playSources(item)[0]?.url)
+  const source=normalizeUrl(url)
   if(!videoEl.value||!source){playerMessage.value='暂无可播放源';return}
   playerMessage.value='正在连接播放源…'
-  mediaError=()=>{playerMessage.value='视频播放失败，请检查播放源'}
+  const token=++loadToken
+  mediaError=()=>{if(token===loadToken) playerMessage.value='视频播放失败，可尝试切换播放线路'}
   videoEl.value.addEventListener('error',mediaError)
   const isHls=/\.m3u8(?:$|[?#])/i.test(source)
-  if(isHls&&Hls.isSupported()){
-    hls=new Hls({enableWorker:true,lowLatencyMode:false,backBufferLength:90,maxBufferLength:30})
+  if(isHls && Hls.isSupported()){
+    hls=new Hls({
+      enableWorker:true,
+      lowLatencyMode:false,
+      backBufferLength:60,
+      maxBufferLength:30,
+      manifestLoadingMaxRetry:2,
+      levelLoadingMaxRetry:2,
+      fragLoadingMaxRetry:2,
+      xhrSetup:(xhr)=>{xhr.withCredentials=false}
+    })
     hls.on(Hls.Events.MEDIA_ATTACHED,()=>hls?.loadSource(source))
-    hls.on(Hls.Events.MANIFEST_PARSED,()=>{playerMessage.value=''})
+    hls.on(Hls.Events.MANIFEST_PARSED',()=>{if(token===loadToken) playerMessage.value=''})
     hls.on(Hls.Events.ERROR,(_,data)=>{
-      if(!data?.fatal)return
-      if(data.type===Hls.ErrorTypes.MEDIA_ERROR)hls?.recoverMediaError()
-      else if(data.type===Hls.ErrorTypes.NETWORK_ERROR){playerMessage.value='播放源网络请求失败';setTimeout(()=>hls?.startLoad(),800)}
-      else playerMessage.value='播放源加载失败，请更换视频'
+      if(token!==loadToken || !data?.fatal)return
+      if(data.type===Hls.ErrorTypes.MEDIA_ERROR){hls?.recoverMediaError();return}
+      if(data.type===Hls.ErrorTypes.NETWORK_ERROR){playerMessage.value='播放源网络请求失败，可尝试切换线路';return}
+      playerMessage.value='播放源加载失败，可尝试切换线路'
     })
     hls.attachMedia(videoEl.value)
+  }else if(isHls && videoEl.value.canPlayType('application/vnd.apple.mpegurl')){
+    videoEl.value.src=source
+    videoEl.value.addEventListener('loadedmetadata',()=>{if(token===loadToken) playerMessage.value=''},{once:true})
+    videoEl.value.load()
   }else{
     videoEl.value.src=source
-    videoEl.value.addEventListener('loadedmetadata',()=>{playerMessage.value=''},{once:true})
+    videoEl.value.addEventListener('loadedmetadata',()=>{if(token===loadToken) playerMessage.value=''},{once:true})
     videoEl.value.load()
   }
 }
+function selectSource(index){
+  if(index<0||index>=sources.value.length)return
+  sourceIndex.value=index
+  mountPlayer(sources.value[index].url)
+}
 async function load(){
-  stopped=false;v.value=null;recommend.value=[];playerMessage.value='正在加载视频…';destroyPlayer()
+  stopped=false;v.value=null;recommend.value=[];sources.value=[];sourceIndex.value=0;playerMessage.value='正在加载视频…';destroyPlayer()
   const id=route.params.id;if(!id)return
   try{
     const item=detailItem(await getDetail(id));if(stopped)return
     if(!item){playerMessage.value='未找到该视频';return}
     v.value=item
-    mountPlayer(item)
+    sources.value=playSources(item)
+    if(sources.value.length) mountPlayer(sources.value[0].url)
+    else playerMessage.value='API 没有返回可播放地址'
     if(item.vod_id){const h=JSON.parse(localStorage.getItem('history')||'[]').filter(x=>String(x.id)!==String(item.vod_id));h.unshift({id:item.vod_id,name:item.vod_name,pic:item.vod_pic,type_name:item.type_name});localStorage.setItem('history',JSON.stringify(h.slice(0,30)))}
     if(item.type_id){
-      const rr=await getCategoryVideos(item.type_id,1,24)
-      if(stopped)return
-      recommend.value=(rr?.list||[]).filter(x=>String(x.vod_id)!==String(item.vod_id)).slice(0,8)
+      try{
+        const rr=await getCategoryVideos(item.type_id,1,24)
+        if(!stopped) recommend.value=(Array.isArray(rr?.list)?rr.list:[]).filter(x=>String(x.vod_id)!==String(item.vod_id)).slice(0,8)
+      }catch(e){console.warn('相关推荐请求失败',e)}
     }
     document.title=`${item.vod_name||'播放'} - 91XS`
-  }catch(e){console.error('播放页加载失败',e);playerMessage.value='视频加载失败，请刷新重试'}
+  }catch(e){console.error('播放页加载失败',e);playerMessage.value='视频详情加载失败，请刷新重试'}
 }
 async function share(){try{if(navigator.share)await navigator.share({title:v.value?.vod_name||document.title,url:location.href});else{await navigator.clipboard.writeText(location.href);alert('链接已复制')}}catch{}}
 watch(()=>route.params.id,load,{immediate:true})
@@ -94,5 +122,5 @@ onBeforeUnmount(()=>{stopped=true;destroyPlayer()})
 </script>
 
 <style scoped>
-.play-page{padding:16px 0 36px;background:#fff}.play-shell{width:100%}.player-section{border:1px solid #e2e2e2;background:#111}.player-head{height:34px;display:flex;align-items:center;gap:7px;padding:0 10px;background:#078acb;color:#fff;font-size:12px}.status-dot{width:6px;height:6px;border-radius:50%;background:#fff}.player-tip{margin-left:auto;font-size:10px;opacity:.8}.player-wrap{position:relative;background:#111}.player-video{display:block;width:100%;aspect-ratio:16/9;background:#111}.player-state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#aaa;background:rgba(0,0,0,.35);font-size:13px;pointer-events:none}.video-info{display:flex;justify-content:space-between;gap:20px;margin-top:8px;padding:14px;background:#fff;border:1px solid #e5e5e5}.info-main{min-width:0}.kicker{font-size:9px;color:#078acb;letter-spacing:.15em;font-weight:700}.video-info h1{margin:4px 0 8px;color:#333;font-size:20px;line-height:1.45}.meta{display:flex;gap:6px;flex-wrap:wrap}.meta span{padding:3px 7px;background:#f2f2f2;color:#888;font-size:10px}.video-info p{margin:10px 0 0;color:#777;font-size:12px;line-height:1.7}.share{align-self:flex-start;border:1px solid #ccc;background:#fafafa;color:#666;padding:6px 13px;cursor:pointer}.recommend{margin-top:14px;border:1px solid #e1e1e1;background:#fff}.section-title{height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#078acb;color:#fff}.section-title small{font-size:8px;opacity:.85;letter-spacing:.12em}.section-title h2{margin:1px 0 0;font-size:14px}.section-title>span{font-size:10px;opacity:.85}.recommend-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:6px}.recommend-empty{padding:36px;text-align:center;color:#999}.empty{padding:60px;text-align:center;color:#999}@media(max-width:640px){.play-page{padding:8px 0 25px}.player-head{height:32px}.player-tip{display:none}.video-info{padding:10px;gap:8px}.video-info h1{font-size:17px}.video-info p{font-size:11px}.recommend-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section-title{height:38px}}
+.play-page{padding:16px 0 36px;background:#fff}.play-shell{width:100%}.player-section{border:1px solid #e2e2e2;background:#111}.player-head{height:34px;display:flex;align-items:center;gap:7px;padding:0 10px;background:#078acb;color:#fff;font-size:12px}.status-dot{width:6px;height:6px;border-radius:50%;background:#fff}.player-tip{margin-left:auto;font-size:10px;opacity:.8}.player-wrap{position:relative;background:#111}.player-video{display:block;width:100%;aspect-ratio:16/9;background:#111}.player-state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#bbb;background:rgba(0,0,0,.35);font-size:13px;pointer-events:none}.source-bar{display:flex;align-items:center;gap:6px;min-height:38px;padding:5px 8px;background:#1d1d1d;color:#aaa;overflow-x:auto;white-space:nowrap}.source-bar button{border:1px solid #555;background:#2b2b2b;color:#ccc;padding:4px 9px;font-size:11px;cursor:pointer}.source-bar button.active{border-color:#078acb;background:#078acb;color:#fff}.video-info{display:flex;justify-content:space-between;gap:20px;margin-top:8px;padding:14px;background:#fff;border:1px solid #e5e5e5}.info-main{min-width:0}.kicker{font-size:9px;color:#078acb;letter-spacing:.15em;font-weight:700}.video-info h1{margin:4px 0 8px;color:#333;font-size:20px;line-height:1.45}.meta{display:flex;gap:6px;flex-wrap:wrap}.meta span{padding:3px 7px;background:#f2f2f2;color:#888;font-size:10px}.video-info p{margin:10px 0 0;color:#777;font-size:12px;line-height:1.7}.share{align-self:flex-start;border:1px solid #ccc;background:#fafafa;color:#666;padding:6px 13px;cursor:pointer}.recommend{margin-top:14px;border:1px solid #e1e1e1;background:#fff}.section-title{height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#078acb;color:#fff}.section-title small{font-size:8px;opacity:.85;letter-spacing:.12em}.section-title h2{margin:1px 0 0;font-size:14px}.section-title>span{font-size:10px;opacity:.85}.recommend-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:6px}.recommend-empty{padding:36px;text-align:center;color:#999}.empty{padding:60px;text-align:center;color:#999}@media(max-width:640px){.play-page{padding:8px 0 25px}.player-head{height:32px}.player-tip{display:none}.video-info{padding:10px;gap:8px}.video-info h1{font-size:17px}.video-info p{font-size:11px}.recommend-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section-title{height:38px}}
 </style>

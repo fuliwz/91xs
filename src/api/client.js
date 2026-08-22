@@ -1,9 +1,8 @@
 import axios from 'axios'
 
-// Always call the same-origin proxy in the browser. The upstream API is kept
-// server-side by Vite (development) / the deployed reverse proxy (production),
-// so the browser never sends a cross-origin request to lbapi9.com.
-export const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+// All API groups use same-origin endpoints. The browser never talks directly
+// to an upstream API host, which keeps CORS out of the frontend completely.
+export const API_BASE = import.meta.env.VITE_API_BASE || '/api/vod'
 export const ART_API_BASE = import.meta.env.VITE_ART_API_BASE || '/api/art'
 
 const clients = new Map()
@@ -20,7 +19,9 @@ function getClient(baseURL) {
 }
 
 export async function request(params = {}, baseURL = API_BASE) {
-  const { data } = await getClient(baseURL).get('', { params: { at: 'json', ...params } })
+  const { data } = await getClient(baseURL).get('', {
+    params: { at: 'json', ...params },
+  })
   if (!data) throw new Error('API empty response')
   return data
 }

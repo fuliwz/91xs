@@ -35,13 +35,13 @@ import VideoCard from '../components/VideoCard.vue'
 const route = useRoute()
 const vod = ref(null), recommend = ref([]), sources = ref([]), sourceIndex = ref(0), video = ref(null)
 const playerLoading = ref(true), playerMessage = ref('正在加载视频…'), resumeText = ref('')
-let hls = null, progressTimer = null, currentLoad = 0
+let hls = null, progressTimer = null, currentLoad = 0, playerLoad = 0
 
 function readJson(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)) } catch { return fallback } }
 function formatTime(sec) { const m = Math.floor(sec / 60); const s = Math.floor(sec % 60).toString().padStart(2,'0'); return `${m}:${s}` }
 function saveProgress() { const item=vod.value, el=video.value; if(!item?.vod_id || !el?.duration || !el.currentTime)return; const d=readJson('91xs_watch_progress',{}); d[item.vod_id]={currentTime:el.currentTime,duration:el.duration,updatedAt:Date.now()}; localStorage.setItem('91xs_watch_progress',JSON.stringify(d)) }
 function applyResume() { const p=readJson('91xs_watch_progress',{})[vod.value?.vod_id], el=video.value; if(!p||!el||p.currentTime<15||p.currentTime>p.duration-5)return; const restore=()=>{if(!video.value)return;el.currentTime=p.currentTime;resumeText.value=`上次看到 ${formatTime(p.currentTime)}`}; if(el.readyState>=1)restore();else el.addEventListener('loadedmetadata',restore,{once:true}) }
-function destroyPlayer() { clearInterval(progressTimer);progressTimer=null;saveProgress();if(hls){try{hls.stopLoad();hls.detachMedia();hls.destroy()}catch(_){}hls=null}if(video.value){try{video.value.pause();video.value.removeAttribute('src');video.value.load()}catch(_){}} }
+function destroyPlayer() { playerLoad++;clearInterval(progressTimer);progressTimer=null;saveProgress();if(hls){try{hls.stopLoad();hls.detachMedia();hls.destroy()}catch(_){}hls=null}if(video.value){try{video.value.pause();video.value.removeAttribute('src');video.value.load()}catch(_){}} }
 
 const BaseLoader = Hls.DefaultConfig?.loader
 class HttpsLoader extends BaseLoader {
@@ -57,16 +57,16 @@ function initPlayer(url) {
   const el=video.value, source=secureUrl(url)
   if(!el){playerLoading.value=false;playerMessage.value='播放器元素尚未就绪';return}
   if(!source){playerLoading.value=false;playerMessage.value='API 没有返回可播放地址';return}
-  destroyPlayer();playerLoading.value=true;playerMessage.value='正在连接 HTTPS 播放源…';const token=++currentLoad
-  const ready=()=>{if(token!==currentLoad)return;playerLoading.value=false;playerMessage.value='';applyResume()}
-  const failed=()=>{if(token===currentLoad){playerLoading.value=true;playerMessage.value='播放失败，请检查播放源 HTTPS/CORS 配置或切换线路'}}
+  destroyPlayer();playerLoading.value=true;playerMessage.value='正在连接 HTTPS 播放源…';const token=++playerLoad
+  const ready=()=>{if(token!==playerLoad)return;playerLoading.value=false;playerMessage.value='';applyResume()}
+  const failed=()=>{if(token===playerLoad){playerLoading.value=true;playerMessage.value='播放失败，请检查播放源 HTTPS/CORS 配置或切换线路'}}
   el.addEventListener('loadedmetadata',ready,{once:true});el.addEventListener('error',failed,{once:true})
   const isHls=/\.m3u8(?:$|[?#])/i.test(source)
   if(isHls&&Hls.isSupported()&&BaseLoader){
     hls=new Hls({loader:HttpsLoader,enableWorker:true,lowLatencyMode:false,backBufferLength:90,maxBufferLength:30,manifestLoadingMaxRetry:2,levelLoadingMaxRetry:2,fragLoadingMaxRetry:2,xhrSetup:xhr=>{xhr.withCredentials=false}})
-    hls.on(Hls.Events.MEDIA_ATTACHED,()=>{if(token===currentLoad)hls.loadSource(source)})
+    hls.on(Hls.Events.MEDIA_ATTACHED,()=>{if(token===playerLoad)hls.loadSource(source)})
     hls.on(Hls.Events.MANIFEST_PARSED,ready)
-    hls.on(Hls.Events.ERROR,(_,data)=>{if(token!==currentLoad||!data?.fatal)return;if(data.type===Hls.ErrorTypes.MEDIA_ERROR){try{hls.recoverMediaError()}catch(_){failed()}}else failed()})
+    hls.on(Hls.Events.ERROR,(_,data)=>{if(token!==playerLoad||!data?.fatal)return;if(data.type===Hls.ErrorTypes.MEDIA_ERROR){try{hls.recoverMediaError()}catch(_){failed()}}else failed()})
     hls.attachMedia(el)
   }else{
     el.src=source
@@ -85,10 +85,6 @@ async function loadData(){
     if(!item){playerLoading.value=false;playerMessage.value='未找到该视频';return}
     vod.value=item
     sources.value=playSources(item)
-    // v-if="vod" creates the <video> element on the next Vue render tick.
-    // The old code called initPlayer immediately here while video.value was still null.
-    // That made the player silently abort before assigning the m3u8 URL, which also
-    // explains why the native controls appeared to be missing/unusable.
     await nextTick()
     if(token!==currentLoad)return
     if(sources.value.length)initPlayer(sources.value[0].url)

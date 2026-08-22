@@ -34,10 +34,6 @@ export async function onRequest(context) {
 
   let response = await fetchUpstream(params)
 
-  // The frontend intentionally asks for ac=detail because video cards need
-  // full fields such as vod_pic. Some CMS mirrors do not implement detail as
-  // a paginated list; in that case keep the same browser URL but transparently
-  // fall back to the list endpoint server-side.
   if (!isArticle && params.get('ac') === 'detail' && !params.has('ids') && response.ok) {
     try {
       const probe = await response.clone().json()
@@ -55,6 +51,45 @@ export async function onRequest(context) {
       }
     } catch {
       // Preserve the original upstream response if it is not JSON.
+    }
+  }
+
+  // Article image URLs are supplied by the upstream API. Rewrite them here,
+  // after the API response has been loaded, so art_pic and URLs embedded in
+  // art_content are fixed before the browser receives the JSON.
+  if (isArticle && response.ok) {
+    try {
+      const contentType = response.headers.get('content-type') || ''
+      if (contentType.includes('application/json') || contentType.includes('text/json')) {
+        const payload = await response.clone().json()
+        const oldHost = /https?:\\/\\/tu\\.fhpicpic\\.com/gi
+        const newHost = 'https://mei.lbpictupian.com'
+
+        const rewrite = value => {
+          if (typeof value === 'string') return value.replace(oldHost, newHost)
+          if (Array.isArray(value)) return value.map(rewrite)
+          if (value && typeof value === 'object') {
+            return Object.fromEntries(Object.entries(value).map(([key, val]) => [key, rewrite(val)]))
+          }
+          return value
+        }
+
+        const rewritten = rewrite(payload)
+        const headers = new Headers(response.headers)
+        headers.set('Content-Type', 'application/json; charset=utf-8')
+        headers.set('Access-Control-Allow-Origin', '*')
+        headers.set('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        headers.set('Access-Control-Allow-Headers', 'Content-Type')
+        headers.set('Cache-Control', 'public, max-age=60')
+        headers.set('Vary', 'Origin')
+        return new Response(JSON.stringify(rewritten), {
+          status: response.status,
+          headers,
+        })
+      }
+    } catch {
+      // Fall through and return the upstream response unchanged if rewriting
+      // cannot be performed.
     }
   }
 

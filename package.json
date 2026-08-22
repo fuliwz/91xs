@@ -1,9 +1,9 @@
 {
-  "name":"155-vue-4hu-style",
-  "version":"1.0.0",
-  "private":true,
-  "type":"module",
-  "scripts":{"dev":"vite","build":"vite build","preview":"vite preview"},
-  "dependencies":{"@vitejs/plugin-vue":"latest","axios":"latest","hls.js":"latest","vite":"latest","vue":"latest","vue-router":"latest"},
-  "devDependencies":{}
+  "name": "91xs-portal-vue",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"dev":"vite","build":"vite build","preview":"vite preview"},
+  "dependencies": {"@vitejs/plugin-vue":"latest","axios":"latest","hls.js":"latest","vite":"latest","vue":"latest","vue-router":"latest"},
+  "devDependencies": {}
 }

@@ -54,15 +54,14 @@ export async function onRequest(context) {
     }
   }
 
-  // Article image URLs are supplied by the upstream API. Rewrite them here,
-  // after the API response has been loaded, so art_pic and URLs embedded in
-  // art_content are fixed before the browser receives the JSON.
+  // Article image URLs are supplied by the upstream API. Rewrite them after
+  // the upstream JSON is loaded, before the browser receives the response.
   if (isArticle && response.ok) {
     try {
       const contentType = response.headers.get('content-type') || ''
       if (contentType.includes('application/json') || contentType.includes('text/json')) {
-        const payload = await response.clone().json()
-        const oldHost = /https?:\\/\\/tu\\.fhpicpic\\.com/gi
+        const payload = await response.json()
+        const oldHost = /https?:\/\/tu\.fhpicpic\.com/gi
         const newHost = 'https://mei.lbpictupian.com'
 
         const rewrite = value => {

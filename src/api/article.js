@@ -1,0 +1,25 @@
+import { request, ART_API_BASE } from './client'
+
+export const getArticles = (params = {}) => request({ ac: 'list', pg: 1, limit: 20, ...params }, ART_API_BASE)
+export const getArticleDetail = id => request({ ac: 'detail', ids: id }, ART_API_BASE)
+export const searchArticles = (wd, page = 1) => request({ ac: 'list', wd, pg: page, limit: 20 }, ART_API_BASE)
+
+export function normalizeArticles(res) {
+  return Array.isArray(res?.list) ? res.list : Array.isArray(res?.data) ? res.data : []
+}
+
+export function articleItem(res) {
+  return normalizeArticles(res)[0] || null
+}
+
+export function articleTitle(item) {
+  return item?.art_name || item?.title || item?.name || '未命名文章'
+}
+
+export function articlePic(item) {
+  return item?.art_pic || item?.art_pic_thumb || item?.pic || item?.image || ''
+}
+
+export function articleContent(item) {
+  return item?.art_content || item?.content || item?.art_blurb || item?.description || ''
+}

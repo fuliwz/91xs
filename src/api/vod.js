@@ -8,16 +8,35 @@ async function cached(key, fn) {
   return p
 }
 
-// AppleCMS provide/vod listing uses ac=list. Detail requests use ac=detail.
 export const getCategories = () => cached('cats', () => request({ ac: 'list', pg: 1, limit: 100 }))
 export const getVideos = (params = {}) => request({ ac: 'list', pg: 1, limit: 24, ...params })
 export const getCategoryVideos = (id, page = 1, limit = 24) => request({ ac: 'list', t: id, pg: Math.max(1, Number(page) || 1), limit })
 export const searchVideos = (wd, page = 1, limit = 24) => request({ ac: 'list', wd: String(wd || '').trim(), pg: Math.max(1, Number(page) || 1), limit })
 export const getDetail = id => request({ ac: 'detail', ids: id })
 
-export function normalizeList(res) { return Array.isArray(res?.list) ? res.list : [] }
-export function normalizeCats(res) { return Array.isArray(res?.class) ? res.class : [] }
-export function detailItem(res) { return res?.list?.[0] || null }
+// Different CMS mirrors may wrap the list in data/result instead of list.
+// Normalize all known shapes here so every page receives a plain array.
+export function normalizeList(res) {
+  if (Array.isArray(res)) return res
+  if (Array.isArray(res?.list)) return res.list
+  if (Array.isArray(res?.data?.list)) return res.data.list
+  if (Array.isArray(res?.data)) return res.data
+  if (Array.isArray(res?.result?.list)) return res.result.list
+  if (Array.isArray(res?.result)) return res.result
+  return []
+}
+
+export function normalizeCats(res) {
+  if (Array.isArray(res)) return res
+  if (Array.isArray(res?.class)) return res.class
+  if (Array.isArray(res?.data?.class)) return res.data.class
+  if (Array.isArray(res?.data)) return res.data
+  return []
+}
+
+export function detailItem(res) {
+  return normalizeList(res)[0] || null
+}
 
 export function secureUrl(value) {
   const source = String(value || '').trim()

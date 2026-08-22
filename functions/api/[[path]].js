@@ -2,7 +2,7 @@ export async function onRequest(context) {
   const incoming = new URL(context.request.url)
   const route = Array.isArray(context.params?.path) ? context.params.path.join('/') : String(context.params?.path || '')
   const isArticle = route === 'art' || route.startsWith('art/')
-  const upstream = new URL(isArticle ? 'https://155api.com/api.php/provide/art/' : 'https://155api.com/api.php/provide/vod/')
+  const upstream = new URL(isArticle ? 'https://lbapi9.com/api.php/provide/art/' : 'https://lbapi9.com/api.php/provide/vod/')
 
   for (const [key, value] of incoming.searchParams) upstream.searchParams.set(key, value)
   if (!upstream.searchParams.has('at')) upstream.searchParams.set('at', 'json')

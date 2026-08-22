@@ -15,30 +15,21 @@ export const getCategoryVideos = (id, page = 1, limit = 24) => request({ ac: 'de
 export const searchVideos = (wd, page = 1, limit = 24) => request({ ac: 'detail', wd: String(wd || '').trim(), pg: Math.max(1, Number(page) || 1), limit })
 export const getDetail = id => request({ ac: 'detail', ids: id })
 
-export function normalizeList(res) {
-  return Array.isArray(res?.list) ? res.list : []
-}
-export function normalizeCats(res) {
-  return Array.isArray(res?.class) ? res.class : []
-}
-export function detailItem(res) {
-  return res?.list?.[0] || null
-}
+export function normalizeList(res) { return Array.isArray(res?.list) ? res.list : [] }
+export function normalizeCats(res) { return Array.isArray(res?.class) ? res.class : [] }
+export function detailItem(res) { return res?.list?.[0] || null }
 
 function cleanSource(value) {
-  return String(value || '').trim().replace(/^['"]|['"]$/g, '')
+  return String(value || '').trim().replace(/^['"]+|['"]+$/g, '').replace(/\\u0026/gi, '&').replace(/&amp;/gi, '&')
 }
 
-// Parse AppleCMS vod_play_url safely. A source can be:
-//   高清$https://...m3u8
-//   高清$https://...m3u8#备用$https://...m3u8
-//   https://...m3u8
+// AppleCMS format: source1$episode-url#episode-url$$$source2$episode-url
 export function playSources(v) {
   const raw = String(v?.vod_play_url || '').trim()
   if (!raw) return []
   return raw
-    .split(/\r?\n/)
-    .flatMap(line => line.split('#'))
+    .split('$$$')
+    .flatMap(source => source.split(/[#\r\n]+/))
     .map(part => cleanSource(part))
     .filter(Boolean)
     .map(part => {
@@ -50,9 +41,7 @@ export function playSources(v) {
     .filter(item => /^https?:\/\//i.test(item.url) || item.url.startsWith('//'))
 }
 
-export function playUrl(v) {
-  return playSources(v)[0]?.url || ''
-}
+export function playUrl(v) { return playSources(v)[0]?.url || '' }
 
 export async function getCategoryLatest(id, limit = 12) {
   const res = await getCategoryVideos(id, 1, limit)

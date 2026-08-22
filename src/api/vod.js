@@ -8,11 +8,12 @@ async function cached(key, fn) {
   return p
 }
 
-// Video API uses exactly the same same-origin client pattern as articles/images.
+// Video API uses the detail endpoint for video cards so fields such as
+// vod_pic, vod_remarks and vod_play_url are available to the frontend.
 export const getCategories = () => cached('vod-cats', () => request({ ac: 'list', pg: 1, limit: 100 }, API_BASE))
-export const getVideos = (params = {}) => request({ ac: 'list', pg: 1, limit: 24, ...params }, API_BASE)
-export const getCategoryVideos = (tid, page = 1, limit = 24) => request({ ac: 'list', t: tid, pg: Math.max(1, Number(page) || 1), limit }, API_BASE)
-export const searchVideos = (wd, page = 1, limit = 24) => request({ ac: 'list', wd: String(wd || '').trim(), pg: Math.max(1, Number(page) || 1), limit }, API_BASE)
+export const getVideos = (params = {}) => request({ ac: 'detail', pg: 1, limit: 24, ...params }, API_BASE)
+export const getCategoryVideos = (tid, page = 1, limit = 24) => request({ ac: 'detail', t: tid, pg: Math.max(1, Number(page) || 1), limit }, API_BASE)
+export const searchVideos = (wd, page = 1, limit = 24) => request({ ac: 'detail', wd: String(wd || '').trim(), pg: Math.max(1, Number(page) || 1), limit }, API_BASE)
 export const getDetail = id => request({ ac: 'detail', ids: id }, API_BASE)
 
 export function normalizeList(res) {

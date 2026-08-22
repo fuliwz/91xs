@@ -1,4 +1,4 @@
-import { request } from './client'
+import { request, API_BASE } from './client'
 
 const cache = new Map()
 async function cached(key, fn) {
@@ -8,14 +8,13 @@ async function cached(key, fn) {
   return p
 }
 
-export const getCategories = () => cached('cats', () => request({ ac: 'list', pg: 1, limit: 100 }))
-export const getVideos = (params = {}) => request({ ac: 'list', pg: 1, limit: 24, ...params })
-export const getCategoryVideos = (id, page = 1, limit = 24) => request({ ac: 'list', t: id, pg: Math.max(1, Number(page) || 1), limit })
-export const searchVideos = (wd, page = 1, limit = 24) => request({ ac: 'list', wd: String(wd || '').trim(), pg: Math.max(1, Number(page) || 1), limit })
-export const getDetail = id => request({ ac: 'detail', ids: id })
+// Video API uses exactly the same same-origin client pattern as articles/images.
+export const getCategories = () => cached('vod-cats', () => request({ ac: 'list', pg: 1, limit: 100 }, API_BASE))
+export const getVideos = (params = {}) => request({ ac: 'list', pg: 1, limit: 24, ...params }, API_BASE)
+export const getCategoryVideos = (tid, page = 1, limit = 24) => request({ ac: 'list', t: tid, pg: Math.max(1, Number(page) || 1), limit }, API_BASE)
+export const searchVideos = (wd, page = 1, limit = 24) => request({ ac: 'list', wd: String(wd || '').trim(), pg: Math.max(1, Number(page) || 1), limit }, API_BASE)
+export const getDetail = id => request({ ac: 'detail', ids: id }, API_BASE)
 
-// Different CMS mirrors may wrap the list in data/result instead of list.
-// Normalize all known shapes here so every page receives a plain array.
 export function normalizeList(res) {
   if (Array.isArray(res)) return res
   if (Array.isArray(res?.list)) return res.list
@@ -34,39 +33,26 @@ export function normalizeCats(res) {
   return []
 }
 
-export function detailItem(res) {
-  return normalizeList(res)[0] || null
-}
+export function detailItem(res) { return normalizeList(res)[0] || null }
 
 export function secureUrl(value) {
   const source = String(value || '').trim()
   if (!source) return ''
-  const cleaned = source
-    .replace(/^['"]+|['"]+$/g, '')
-    .replace(/\\u0026/gi, '&')
-    .replace(/&amp;/gi, '&')
+  const cleaned = source.replace(/^['"]+|['"]+$/g, '').replace(/\\u0026/gi, '&').replace(/&amp;/gi, '&')
   if (cleaned.startsWith('//')) return `https:${cleaned}`
   if (/^http:\/\//i.test(cleaned)) return cleaned.replace(/^http:\/\//i, 'https://')
   return cleaned
 }
 
-function cleanSource(value) { return secureUrl(value) }
-
 export function playSources(v) {
   const raw = String(v?.vod_play_url || '').trim()
   if (!raw) return []
-  return raw
-    .split('$$$')
-    .flatMap(source => source.split(/[#\r\n]+/))
-    .map(part => cleanSource(part))
-    .filter(Boolean)
-    .map(part => {
-      const idx = part.indexOf('$')
-      const url = idx >= 0 ? part.slice(idx + 1) : part
-      const name = idx >= 0 ? part.slice(0, idx) : '播放源'
-      return { name: name || '播放源', url: cleanSource(url) }
-    })
-    .filter(item => /^https:\/\//i.test(item.url))
+  return raw.split('$$$').flatMap(source => source.split(/[#\r\n]+/)).map(part => secureUrl(part)).filter(Boolean).map(part => {
+    const idx = part.indexOf('$')
+    const url = idx >= 0 ? part.slice(idx + 1) : part
+    const name = idx >= 0 ? part.slice(0, idx) : '播放源'
+    return { name: name || '播放源', url: secureUrl(url) }
+  }).filter(item => /^https:\/\//i.test(item.url))
 }
 
 export function playUrl(v) { return playSources(v)[0]?.url || '' }

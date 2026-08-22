@@ -1,1 +1,18 @@
-export async function onRequest(context){const url=new URL(context.request.url);const target=new URL('https://155api.com/api.php/provide/vod/');for(const [k,v] of url.searchParams)target.searchParams.set(k,v);if(!target.searchParams.has('at'))target.searchParams.set('at','json');const res=await fetch(target.toString(),{headers:{'User-Agent':'155-Vue-API-Proxy'}});const headers=new Headers(res.headers);headers.set('Access-Control-Allow-Origin','*');headers.set('Cache-Control','public, max-age=60');return new Response(res.body,{status:res.status,headers})}
+export async function onRequest(context) {
+  const incoming = new URL(context.request.url)
+  const route = Array.isArray(context.params?.path) ? context.params.path.join('/') : String(context.params?.path || '')
+  const isArticle = route === 'art' || route.startsWith('art/')
+  const upstream = new URL(isArticle ? 'https://155api.com/api.php/provide/art/' : 'https://155api.com/api.php/provide/vod/')
+
+  for (const [key, value] of incoming.searchParams) upstream.searchParams.set(key, value)
+  if (!upstream.searchParams.has('at')) upstream.searchParams.set('at', 'json')
+
+  const response = await fetch(upstream.toString(), {
+    headers: { 'User-Agent': '91XS-Vue-API-Proxy' },
+  })
+  const headers = new Headers(response.headers)
+  headers.set('Access-Control-Allow-Origin', '*')
+  headers.set('Access-Control-Allow-Methods', 'GET,OPTIONS')
+  headers.set('Cache-Control', 'public, max-age=60')
+  return new Response(response.body, { status: response.status, headers })
+}

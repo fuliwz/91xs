@@ -8,18 +8,17 @@ async function cached(key, fn) {
   return p
 }
 
-// 155 API uses the AppleCMS legacy provide/vod contract.
+// AppleCMS provide/vod listing uses ac=list. Detail requests use ac=detail.
 export const getCategories = () => cached('cats', () => request({ ac: 'list', pg: 1, limit: 100 }))
-export const getVideos = (params = {}) => request({ ac: 'detail', pg: 1, limit: 24, ...params })
-export const getCategoryVideos = (id, page = 1, limit = 24) => request({ ac: 'detail', t: id, pg: Math.max(1, Number(page) || 1), limit })
-export const searchVideos = (wd, page = 1, limit = 24) => request({ ac: 'detail', wd: String(wd || '').trim(), pg: Math.max(1, Number(page) || 1), limit })
+export const getVideos = (params = {}) => request({ ac: 'list', pg: 1, limit: 24, ...params })
+export const getCategoryVideos = (id, page = 1, limit = 24) => request({ ac: 'list', t: id, pg: Math.max(1, Number(page) || 1), limit })
+export const searchVideos = (wd, page = 1, limit = 24) => request({ ac: 'list', wd: String(wd || '').trim(), pg: Math.max(1, Number(page) || 1), limit })
 export const getDetail = id => request({ ac: 'detail', ids: id })
 
 export function normalizeList(res) { return Array.isArray(res?.list) ? res.list : [] }
 export function normalizeCats(res) { return Array.isArray(res?.class) ? res.class : [] }
 export function detailItem(res) { return res?.list?.[0] || null }
 
-// Always return browser-safe HTTPS URLs. This is important because the site itself is served over HTTPS.
 export function secureUrl(value) {
   const source = String(value || '').trim()
   if (!source) return ''
@@ -32,11 +31,8 @@ export function secureUrl(value) {
   return cleaned
 }
 
-function cleanSource(value) {
-  return secureUrl(value)
-}
+function cleanSource(value) { return secureUrl(value) }
 
-// AppleCMS format: source1$episode-url#episode-url$$$source2$episode-url
 export function playSources(v) {
   const raw = String(v?.vod_play_url || '').trim()
   if (!raw) return []

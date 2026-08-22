@@ -17,20 +17,42 @@ export async function onRequest(context) {
     })
   }
 
-  async function fetchUpstream(params) {
+  if (context.request.method !== 'GET') {
+    return new Response('Method Not Allowed', { status: 405 })
+  }
+
+  const params = new URLSearchParams(incoming.searchParams)
+  if (!params.has('at')) params.set('at', 'json')
+
+  // Cache the final same-origin API response at the Cloudflare edge.
+  // The cache key includes the complete query string, so different pages,
+  // tids, ids and search terms do not share data accidentally.
+  const cache = caches.default
+  const cacheUrl = new URL(incoming)
+  cacheUrl.search = params.toString()
+  const cacheRequest = new Request(cacheUrl.toString(), { method: 'GET' })
+  const cached = await cache.match(cacheRequest)
+  if (cached) {
+    return cached
+  }
+
+  async function fetchUpstream(queryParams) {
     const url = new URL(upstreamBase)
-    for (const [key, value] of params) url.searchParams.set(key, value)
+    for (const [key, value] of queryParams) url.searchParams.set(key, value)
     if (!url.searchParams.has('at')) url.searchParams.set('at', 'json')
     return fetch(url.toString(), {
       headers: {
         'User-Agent': '91XS-Vue-API-Proxy',
         'Accept': 'application/json,text/plain,*/*',
       },
+      // Let Cloudflare reuse the upstream response while the Pages
+      // Functions cache is being populated.
+      cf: {
+        cacheEverything: true,
+        cacheTtl: 300,
+      },
     })
   }
-
-  const params = new URLSearchParams(incoming.searchParams)
-  if (!params.has('at')) params.set('at', 'json')
 
   let response = await fetchUpstream(params)
 
@@ -79,12 +101,14 @@ export async function onRequest(context) {
         headers.set('Access-Control-Allow-Origin', '*')
         headers.set('Access-Control-Allow-Methods', 'GET,OPTIONS')
         headers.set('Access-Control-Allow-Headers', 'Content-Type')
-        headers.set('Cache-Control', 'public, max-age=60')
+        headers.set('Cache-Control', 'public, max-age=60, s-maxage=300')
         headers.set('Vary', 'Origin')
-        return new Response(JSON.stringify(rewritten), {
+        const finalResponse = new Response(JSON.stringify(rewritten), {
           status: response.status,
           headers,
         })
+        await cache.put(cacheRequest, finalResponse.clone())
+        return finalResponse
       }
     } catch {
       // Fall through and return the upstream response unchanged if rewriting
@@ -96,7 +120,13 @@ export async function onRequest(context) {
   headers.set('Access-Control-Allow-Origin', '*')
   headers.set('Access-Control-Allow-Methods', 'GET,OPTIONS')
   headers.set('Access-Control-Allow-Headers', 'Content-Type')
-  headers.set('Cache-Control', 'public, max-age=60')
+  headers.set('Cache-Control', 'public, max-age=60, s-maxage=300')
   headers.set('Vary', 'Origin')
-  return new Response(response.body, { status: response.status, headers })
+  const finalResponse = new Response(response.body, { status: response.status, headers })
+
+  if (response.ok) {
+    await cache.put(cacheRequest, finalResponse.clone())
+  }
+
+  return finalResponse
 }

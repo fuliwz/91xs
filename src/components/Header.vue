@@ -3,7 +3,7 @@
     <div class="top-menu">
       <div class="brand-row">
         <div class="brand-inner">
-          <router-link to="/" class="brand">91XS</router-link>
+          <router-link :to="site.routes.home" class="brand">{{ site.name }}</router-link>
         </div>
       </div>
 
@@ -27,19 +27,12 @@
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
 import menu from '../config/menu.json'
-
-const router = useRouter()
+import site from '../config/site'
 
 function itemLink(row, item) {
-  if (row.type === 'image') return `/image?tid=${item.id}`
-  if (row.type === 'novel') return `/novel?tid=${item.id}`
-  return `/category/${item.id}`
-}
-
-function goSearch(keyword) {
-  const value = String(keyword || '').trim()
-  if (value) router.push({ path: '/search', query: { wd: value } })
+  if (row.type === 'image') return `${site.routes.image}?tid=${item.id}`
+  if (row.type === 'novel') return `${site.routes.novel}?tid=${item.id}`
+  return site.routes.category.replace(':id', item.id)
 }
 </script>

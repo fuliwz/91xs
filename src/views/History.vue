@@ -1,0 +1,1 @@
+<template><section><div class="title"><h1>观看历史</h1></div><VideoGrid :items="items"/></section></template><script setup>import {ref,onMounted} from 'vue';import VideoGrid from '../components/VideoGrid.vue';const items=ref([]);onMounted(()=>{items.value=JSON.parse(localStorage.getItem('history')||'[]').map(x=>({vod_id:x.id,vod_name:x.name,vod_pic:x.pic}))})</script>

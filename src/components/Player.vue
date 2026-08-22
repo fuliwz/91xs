@@ -1,0 +1,2 @@
+<template><div class="player"><video ref="el" controls playsinline preload="metadata"></video></div></template>
+<script setup>import {ref,onMounted,onBeforeUnmount} from 'vue';import Hls from 'hls.js';const props=defineProps({src:String});const el=ref(null);let hls;onMounted(()=>{if(!props.src)return;if(el.value.canPlayType('application/vnd.apple.mpegurl'))el.value.src=props.src;else if(Hls.isSupported()){hls=new Hls({enableWorker:true});hls.loadSource(props.src);hls.attachMedia(el.value)}});onBeforeUnmount(()=>hls?.destroy())</script>

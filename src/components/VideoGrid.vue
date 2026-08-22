@@ -1,0 +1,1 @@
+<template><div v-if="items.length" class="grid"><VideoCard v-for="v in items" :key="v.vod_id" :v="v"/></div><div v-else class="empty">暂无内容</div></template><script setup>import VideoCard from './VideoCard.vue';defineProps({items:{type:Array,default:()=>[]}})</script>

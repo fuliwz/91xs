@@ -9,19 +9,12 @@
         </div>
         <div v-if="sources.length > 1" class="source-bar">
           <span>播放线路：</span>
-          <button v-for="(source,index) in sources" :key="`${source.url}-${index}`" :class="{active:index===sourceIndex}" @click="selectSource(index)">
-            {{ source.name || `线路${index + 1}` }}
-          </button>
+          <button v-for="(source,index) in sources" :key="`${source.url}-${index}`" :class="{active:index===sourceIndex}" @click="selectSource(index)">{{ source.name || `线路${index + 1}` }}</button>
         </div>
       </section>
 
       <section class="video-info">
-        <div class="info-main">
-          <div class="kicker">NOW PLAYING</div>
-          <h1>{{ v.vod_name }}</h1>
-          <div class="meta"><span v-if="v.type_name">{{ v.type_name }}</span><span v-if="v.vod_time">{{ v.vod_time }}</span><span v-if="v.vod_hits">{{ v.vod_hits }} 次播放</span></div>
-          <p v-if="v.vod_blurb || v.vod_content">{{ v.vod_blurb || v.vod_content }}</p>
-        </div>
+        <div class="info-main"><div class="kicker">NOW PLAYING</div><h1>{{ v.vod_name }}</h1><div class="meta"><span v-if="v.type_name">{{ v.type_name }}</span><span v-if="v.vod_time">{{ v.vod_time }}</span><span v-if="v.vod_hits">{{ v.vod_hits }} 次播放</span></div><p v-if="v.vod_blurb || v.vod_content">{{ v.vod_blurb || v.vod_content }}</p></div>
         <button class="share" type="button" @click="share">分享</button>
       </section>
 
@@ -42,83 +35,15 @@ import Hls from 'hls.js'
 import { getDetail, getCategoryVideos, detailItem, playSources } from '../api/vod'
 import VideoCard from '../components/VideoCard.vue'
 
-const route=useRoute(), v=ref(null), recommend=ref([]), sources=ref([]), sourceIndex=ref(0), videoEl=ref(null), playerMessage=ref('')
-let hls=null, mediaError=null, stopped=false, loadToken=0
-
-function destroyPlayer(){
-  if(hls){hls.destroy();hls=null}
-  if(videoEl.value && mediaError) videoEl.value.removeEventListener('error',mediaError)
-  mediaError=null
-  if(videoEl.value){videoEl.value.pause();videoEl.value.removeAttribute('src');videoEl.value.load()}
-}
+const route=useRoute(),v=ref(null),recommend=ref([]),sources=ref([]),sourceIndex=ref(0),videoEl=ref(null),playerMessage=ref('')
+let hls=null,mediaError=null,stopped=false,loadToken=0
+function destroyPlayer(){if(hls){hls.destroy();hls=null}if(videoEl.value&&mediaError)videoEl.value.removeEventListener('error',mediaError);mediaError=null;if(videoEl.value){videoEl.value.pause();videoEl.value.removeAttribute('src');videoEl.value.load()}}
 function normalizeUrl(url){const s=String(url||'').trim();return s.startsWith('//')?`https:${s}`:s}
-function mountPlayer(url){
-  destroyPlayer()
-  const source=normalizeUrl(url)
-  if(!videoEl.value||!source){playerMessage.value='暂无可播放源';return}
-  playerMessage.value='正在连接播放源…'
-  const token=++loadToken
-  mediaError=()=>{if(token===loadToken) playerMessage.value='视频播放失败，可尝试切换播放线路'}
-  videoEl.value.addEventListener('error',mediaError)
-  const isHls=/\.m3u8(?:$|[?#])/i.test(source)
-  if(isHls && Hls.isSupported()){
-    hls=new Hls({
-      enableWorker:true,
-      lowLatencyMode:false,
-      backBufferLength:60,
-      maxBufferLength:30,
-      manifestLoadingMaxRetry:2,
-      levelLoadingMaxRetry:2,
-      fragLoadingMaxRetry:2,
-      xhrSetup:(xhr)=>{xhr.withCredentials=false}
-    })
-    hls.on(Hls.Events.MEDIA_ATTACHED,()=>hls?.loadSource(source))
-    hls.on(Hls.Events.MANIFEST_PARSED',()=>{if(token===loadToken) playerMessage.value=''})
-    hls.on(Hls.Events.ERROR,(_,data)=>{
-      if(token!==loadToken || !data?.fatal)return
-      if(data.type===Hls.ErrorTypes.MEDIA_ERROR){hls?.recoverMediaError();return}
-      if(data.type===Hls.ErrorTypes.NETWORK_ERROR){playerMessage.value='播放源网络请求失败，可尝试切换线路';return}
-      playerMessage.value='播放源加载失败，可尝试切换线路'
-    })
-    hls.attachMedia(videoEl.value)
-  }else if(isHls && videoEl.value.canPlayType('application/vnd.apple.mpegurl')){
-    videoEl.value.src=source
-    videoEl.value.addEventListener('loadedmetadata',()=>{if(token===loadToken) playerMessage.value=''},{once:true})
-    videoEl.value.load()
-  }else{
-    videoEl.value.src=source
-    videoEl.value.addEventListener('loadedmetadata',()=>{if(token===loadToken) playerMessage.value=''},{once:true})
-    videoEl.value.load()
-  }
-}
-function selectSource(index){
-  if(index<0||index>=sources.value.length)return
-  sourceIndex.value=index
-  mountPlayer(sources.value[index].url)
-}
-async function load(){
-  stopped=false;v.value=null;recommend.value=[];sources.value=[];sourceIndex.value=0;playerMessage.value='正在加载视频…';destroyPlayer()
-  const id=route.params.id;if(!id)return
-  try{
-    const item=detailItem(await getDetail(id));if(stopped)return
-    if(!item){playerMessage.value='未找到该视频';return}
-    v.value=item
-    sources.value=playSources(item)
-    if(sources.value.length) mountPlayer(sources.value[0].url)
-    else playerMessage.value='API 没有返回可播放地址'
-    if(item.vod_id){const h=JSON.parse(localStorage.getItem('history')||'[]').filter(x=>String(x.id)!==String(item.vod_id));h.unshift({id:item.vod_id,name:item.vod_name,pic:item.vod_pic,type_name:item.type_name});localStorage.setItem('history',JSON.stringify(h.slice(0,30)))}
-    if(item.type_id){
-      try{
-        const rr=await getCategoryVideos(item.type_id,1,24)
-        if(!stopped) recommend.value=(Array.isArray(rr?.list)?rr.list:[]).filter(x=>String(x.vod_id)!==String(item.vod_id)).slice(0,8)
-      }catch(e){console.warn('相关推荐请求失败',e)}
-    }
-    document.title=`${item.vod_name||'播放'} - 91XS`
-  }catch(e){console.error('播放页加载失败',e);playerMessage.value='视频详情加载失败，请刷新重试'}
-}
+function mountPlayer(url){destroyPlayer();const source=normalizeUrl(url);if(!videoEl.value||!source){playerMessage.value='暂无可播放源';return}playerMessage.value='正在连接播放源…';const token=++loadToken;mediaError=()=>{if(token===loadToken)playerMessage.value='视频播放失败，可尝试切换播放线路'};videoEl.value.addEventListener('error',mediaError);const isHls=/\.m3u8(?:$|[?#])/i.test(source);if(isHls&&Hls.isSupported()){hls=new Hls({enableWorker:true,lowLatencyMode:false,backBufferLength:60,maxBufferLength:30,manifestLoadingMaxRetry:2,levelLoadingMaxRetry:2,fragLoadingMaxRetry:2,xhrSetup:xhr=>{xhr.withCredentials=false}});hls.on(Hls.Events.MEDIA_ATTACHED,()=>hls?.loadSource(source));hls.on(Hls.Events.MANIFEST_PARSED,()=>{if(token===loadToken)playerMessage.value=''});hls.on(Hls.Events.ERROR,(_,data)=>{if(token!==loadToken||!data?.fatal)return;if(data.type===Hls.ErrorTypes.MEDIA_ERROR){hls?.recoverMediaError();return}if(data.type===Hls.ErrorTypes.NETWORK_ERROR){playerMessage.value='播放源网络请求失败，可尝试切换线路';return}playerMessage.value='播放源加载失败，可尝试切换线路'});hls.attachMedia(videoEl.value)}else if(isHls&&videoEl.value.canPlayType('application/vnd.apple.mpegurl')){videoEl.value.src=source;videoEl.value.addEventListener('loadedmetadata',()=>{if(token===loadToken)playerMessage.value=''},{once:true});videoEl.value.load()}else{videoEl.value.src=source;videoEl.value.addEventListener('loadedmetadata',()=>{if(token===loadToken)playerMessage.value=''},{once:true});videoEl.value.load()}}
+function selectSource(index){if(index<0||index>=sources.value.length)return;sourceIndex.value=index;mountPlayer(sources.value[index].url)}
+async function load(){stopped=false;v.value=null;recommend.value=[];sources.value=[];sourceIndex.value=0;playerMessage.value='正在加载视频…';destroyPlayer();const id=route.params.id;if(!id)return;try{const item=detailItem(await getDetail(id));if(stopped)return;if(!item){playerMessage.value='未找到该视频';return}v.value=item;sources.value=playSources(item);if(sources.value.length)mountPlayer(sources.value[0].url);else playerMessage.value='API 没有返回可播放地址';if(item.vod_id){const h=JSON.parse(localStorage.getItem('history')||'[]').filter(x=>String(x.id)!==String(item.vod_id));h.unshift({id:item.vod_id,name:item.vod_name,pic:item.vod_pic,type_name:item.type_name});localStorage.setItem('history',JSON.stringify(h.slice(0,30)))}if(item.type_id){try{const rr=await getCategoryVideos(item.type_id,1,24);if(!stopped)recommend.value=(Array.isArray(rr?.list)?rr.list:[]).filter(x=>String(x.vod_id)!==String(item.vod_id)).slice(0,8)}catch(e){console.warn('相关推荐请求失败',e)}}document.title=`${item.vod_name||'播放'} - 91XS`}catch(e){console.error('播放页加载失败',e);playerMessage.value='视频详情加载失败，请刷新重试'}}
 async function share(){try{if(navigator.share)await navigator.share({title:v.value?.vod_name||document.title,url:location.href});else{await navigator.clipboard.writeText(location.href);alert('链接已复制')}}catch{}}
-watch(()=>route.params.id,load,{immediate:true})
-onBeforeUnmount(()=>{stopped=true;destroyPlayer()})
+watch(()=>route.params.id,load,{immediate:true});onBeforeUnmount(()=>{stopped=true;destroyPlayer()})
 </script>
 
 <style scoped>

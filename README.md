@@ -1,18 +1,30 @@
-# 155 Vue Video Template
+# 91XS Portal Vue
 
-Vue 3 + Vite + Vue Router + Axios + HLS.js.
+Vue 3 + Vite portal-style frontend rebuilt around the supplied reference layout.
 
-## API
-Default API: `https://155api.com/api.php/provide/vod/`.
-The local Vite `/api` proxy and Cloudflare Pages Function both forward to 155API.
+## Data sources
 
-## Run
+- Video API: `https://155api.com/api.php/provide/vod/`
+- Article API: `https://155api.com/api.php/provide/art/`
+- Cloudflare Pages Functions proxy: `/api/vod/*` and `/api/art/*`
+
+## Pages
+
+- `/` portal home with blue header, multi-row category menu and four-column video grid
+- `/category/:id` video category
+- `/search` video search
+- `/detail/:id` video detail
+- `/play/:id` HLS playback
+- `/image` article/image gallery
+- `/image/:id` article/image detail
+- `/novel` article-backed novel list
+- `/novel/:id` novel detail
+- `/history` local viewing history
+
+## Development
+
+```bash
 npm install
 npm run dev
-
-## Build
 npm run build
-
-For direct API usage set `VITE_API_BASE=https://155api.com/api.php/provide/vod/` if the deployment permits CORS. Otherwise keep `/api` and deploy the included Cloudflare Function.
-
-The UI is an original implementation inspired by the dark, compact video-site layout requested by the user; it does not copy the source site's code or proprietary assets.
+```

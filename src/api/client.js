@@ -1,6 +1,9 @@
 import axios from 'axios'
 
-export const API_BASE = import.meta.env.VITE_API_BASE || '/api/vod'
+// The production video API was moved from 155api to lbapi9.
+// Keep an environment override, but use the real upstream endpoint as the
+// default so a production build does not silently fall back to the old /api/vod proxy.
+export const API_BASE = import.meta.env.VITE_API_BASE || 'https://lbapi9.com/api.php/provide/vod'
 export const ART_API_BASE = import.meta.env.VITE_ART_API_BASE || '/api/art'
 
 const clients = new Map()

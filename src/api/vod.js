@@ -19,8 +19,21 @@ export function normalizeList(res) { return Array.isArray(res?.list) ? res.list 
 export function normalizeCats(res) { return Array.isArray(res?.class) ? res.class : [] }
 export function detailItem(res) { return res?.list?.[0] || null }
 
+// Always return browser-safe HTTPS URLs. This is important because the site itself is served over HTTPS.
+export function secureUrl(value) {
+  const source = String(value || '').trim()
+  if (!source) return ''
+  const cleaned = source
+    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/\\u0026/gi, '&')
+    .replace(/&amp;/gi, '&')
+  if (cleaned.startsWith('//')) return `https:${cleaned}`
+  if (/^http:\/\//i.test(cleaned)) return cleaned.replace(/^http:\/\//i, 'https://')
+  return cleaned
+}
+
 function cleanSource(value) {
-  return String(value || '').trim().replace(/^['"]+|['"]+$/g, '').replace(/\\u0026/gi, '&').replace(/&amp;/gi, '&')
+  return secureUrl(value)
 }
 
 // AppleCMS format: source1$episode-url#episode-url$$$source2$episode-url
@@ -38,7 +51,7 @@ export function playSources(v) {
       const name = idx >= 0 ? part.slice(0, idx) : '播放源'
       return { name: name || '播放源', url: cleanSource(url) }
     })
-    .filter(item => /^https?:\/\//i.test(item.url) || item.url.startsWith('//'))
+    .filter(item => /^https:\/\//i.test(item.url))
 }
 
 export function playUrl(v) { return playSources(v)[0]?.url || '' }

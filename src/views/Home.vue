@@ -16,7 +16,7 @@
         <ArticleCard v-for="item in images" :key="item.id" :title="item.title" :pic="item.pic" :to="`/image/${item.id}`" />
       </div>
       <div v-else-if="!articleLoading" class="empty">暂无图片数据</div>
-      <div class="article-actions"><router-link :to="imageTid ? `/image?tid=${imageTid}` : '/image'">查看更多图片</router-link></div>
+      <div class="article-actions"><router-link :to="imageTid ? `/image/list/${imageTid}` : '/image'">查看更多图片</router-link></div>
     </section>
     <section class="portal-section article-preview novel-preview">
       <div class="section-blue">精彩小说</div>
@@ -26,7 +26,7 @@
         </router-link>
       </div>
       <div v-else-if="!articleLoading" class="empty">暂无小说数据</div>
-      <div class="article-actions"><router-link :to="novelTid ? `/novel?tid=${novelTid}` : '/novel'">进入小说专区</router-link></div>
+      <div class="article-actions"><router-link :to="novelTid ? `/novel/list/${novelTid}` : '/novel'">进入小说专区</router-link></div>
     </section>
   </section>
 </template>

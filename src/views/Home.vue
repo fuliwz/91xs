@@ -1,12 +1,5 @@
 <template>
   <section class="portal-home">
-    <div class="search-strip">
-      <strong>搜索影片：</strong>
-      <form @submit.prevent="search">
-        <input v-model="keyword" placeholder="请输入想输入影片的名称" />
-        <button>搜索影片</button>
-      </form>
-    </div>
     <section class="portal-section">
       <div class="section-blue"><span>⟳</span> 最近更新</div>
       <VideoGrid :items="latest" />
@@ -40,14 +33,11 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { getVideos, normalizeList } from '../api/vod'
 import { getArticlesByCategory, normalizeArticles, articleTitle, articlePic } from '../api/article'
 import VideoGrid from '../components/VideoGrid.vue'
 import ArticleCard from '../components/ArticleCard.vue'
 
-const router = useRouter()
-const keyword = ref('')
 const latest = ref([])
 const hot = ref([])
 const images = ref([])
@@ -59,9 +49,6 @@ const articleLoading = ref(true)
 const IMAGE_TIDS = [25, 26, 27, 28, 29, 30, 31, 32]
 const NOVEL_TIDS = [17, 18, 19, 20, 21, 22, 23, 24]
 const randomTid = list => list[Math.floor(Math.random() * list.length)]
-function search() {
-  if (keyword.value.trim()) router.push({ path: '/search', query: { wd: keyword.value.trim() } })
-}
 function normalizeItems(res, type) {
   return normalizeArticles(res).map((item, index) => ({
     id: item.art_id || item.id || `${type}-${index}`,

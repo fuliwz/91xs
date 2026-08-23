@@ -23,10 +23,15 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': {
+      '/api/vod': {
         target: 'https://lbapi9.com',
         changeOrigin: true,
-        rewrite: p => p.replace(/^\/api\/?/, '/api.php/provide/vod'),
+        rewrite: p => p.replace(/^\/api\/vod\/?/, '/api.php/provide/vod'),
+      },
+      '/api/art': {
+        target: 'https://lbapi9.com',
+        changeOrigin: true,
+        rewrite: p => p.replace(/^\/api\/art\/?/, '/api.php/provide/art'),
       },
     },
   },

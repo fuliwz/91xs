@@ -17,8 +17,10 @@ export default [
   { path: site.routes.detail, component: Detail, meta: { titleKey: 'detail' } },
   { path: site.routes.play, component: Play, meta: { titleKey: 'play' } },
   { path: site.routes.history, component: History, meta: { titleKey: 'history' } },
+  { path: site.routes.imageList, component: Image, meta: { titleKey: 'image' } },
   { path: site.routes.image, component: Image, meta: { titleKey: 'image' } },
   { path: site.routes.imageDetail, component: ImageDetail, meta: { titleKey: 'imageDetail' } },
+  { path: site.routes.novelList, component: Novel, meta: { titleKey: 'novel' } },
   { path: site.routes.novel, component: Novel, meta: { titleKey: 'novel' } },
   { path: site.routes.novelDetail, component: NovelDetail, meta: { titleKey: 'novelDetail' } },
 ]

@@ -1,14 +1,15 @@
-import Home from '../views/Home.vue'
-import Category from '../views/Category.vue'
-import Search from '../views/Search.vue'
-import Detail from '../views/Detail.vue'
-import Play from '../views/Play.vue'
-import History from '../views/History.vue'
-import Image from '../views/Image.vue'
-import ImageDetail from '../views/ImageDetail.vue'
-import Novel from '../views/Novel.vue'
-import NovelDetail from '../views/NovelDetail.vue'
 import site from '../config/site'
+
+const Home = () => import('../views/Home.vue')
+const Category = () => import('../views/Category.vue')
+const Search = () => import('../views/Search.vue')
+const Detail = () => import('../views/Detail.vue')
+const Play = () => import('../views/Play.vue')
+const History = () => import('../views/History.vue')
+const Image = () => import('../views/Image.vue')
+const ImageDetail = () => import('../views/ImageDetail.vue')
+const Novel = () => import('../views/Novel.vue')
+const NovelDetail = () => import('../views/NovelDetail.vue')
 
 export default [
   { path: site.routes.home, component: Home, meta: { titleKey: 'home' } },

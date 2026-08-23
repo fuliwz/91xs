@@ -17,8 +17,6 @@ export async function onRequest(context) {
   const params = new URLSearchParams(incoming.searchParams)
   if (!params.has('at')) params.set('at', 'json')
 
-  // Keep public proxy requests bounded so arbitrary callers cannot turn the
-  // Pages Function into an unbounded upstream API relay.
   const page = Number(params.get('pg') || 1)
   const limit = Number(params.get('limit') || 24)
   if (!Number.isInteger(page) || page < 1 || page > 1000) return new Response('Invalid page', { status: 400, headers: corsHeaders })
@@ -41,7 +39,6 @@ export async function onRequest(context) {
     ? 'https://lbapi9.com/api.php/provide/art/'
     : 'https://lbapi9.com/api.php/provide/vod/'
 
-  // Normalize the cache key so parameter order does not create duplicate cache entries.
   const sorted = [...params.entries()].sort(([a], [b]) => a.localeCompare(b))
   const normalized = new URLSearchParams(sorted).toString()
   const cache = caches.default
@@ -64,7 +61,7 @@ export async function onRequest(context) {
         'User-Agent': '91XS-Vue-API-Proxy',
         'Accept': 'application/json,text/plain,*/*',
       },
-      cf: { cacheEverything: true, cacheTtl: 300 },
+      cf: { cacheEverything: true, cacheTtl: 900 },
     })
   }
 
@@ -115,10 +112,13 @@ export async function onRequest(context) {
   const headers = new Headers(finalResponse.headers)
   Object.entries(corsHeaders).forEach(([key, value]) => headers.set(key, value))
   headers.set('Content-Type', headers.get('Content-Type') || 'application/json; charset=utf-8')
-  headers.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
+  headers.set('Cache-Control', 'public, max-age=60, s-maxage=900, stale-while-revalidate=600')
   headers.set('X-API-Cache', 'MISS')
   headers.set('Vary', 'Origin')
   finalResponse = new Response(finalResponse.body, { status: finalResponse.status, headers })
-  await cache.put(cacheRequest, finalResponse.clone())
+
+  // Do not make the visitor wait for the cache write. The response can be
+  // returned immediately while Cloudflare stores it for the next request.
+  context.waitUntil(cache.put(cacheRequest, finalResponse.clone()))
   return finalResponse
 }

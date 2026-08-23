@@ -18,8 +18,11 @@ const site = {
   },
 
   footer: {
-    email: '联系邮箱：service@91xs.example', linksTitle: '友情链接',
-    disclaimer: '内容与数据由接口服务提供。请遵守当地法律法规并合理使用网络内容，本页面仅提供前端展示与索引功能。',
+
+    disclaimer: '警告︰本網站只這合十八歲或以上人士觀看。內容可能令人反感；不可將本網站的內容派發、傳閱、出售、出租、交給或借予年齡未滿18歲的人士或將本網站內容向該人士出示、播放或放映。
+LEGAL DISCLAIMER WARNING: THIS FORUM CONTAINS MATERIAL WHICH MAY OFFEND AND MAY NOT BE DISTRIBUTED, CIRCULATED, SOLD, HIRED, GIVEN, LENT,SHOWN, PLAYED OR PROJECTED TO A PERSON UNDER THE AGE OF 18 YEARS.
+
+站点申明：我们立足于美利坚合众国，受北美法律保护,未满18岁或被误导来到这里，请立即离开',
   },
 
   routes: {
